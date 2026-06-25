@@ -16,8 +16,10 @@ create table if not exists pets (
   id          bigserial primary key,
   group_id    text not null references groups(id) on delete cascade,
   name        text not null,
-  species     text,                          -- 狗 / 貓 / ...（之後做年齡自動調檔用）
-  archived    boolean default false,         -- 之後「紀念模式」用
+  species     text,                          -- 狗 / 貓 / ...
+  birthday    date,                           -- 用於推算生命階段（活動建議自動調整）
+  health      text,                           -- 病況描述
+  archived    boolean default false,         -- 紀念模式
   created_at  timestamptz default now()
 );
 create index if not exists idx_pets_group on pets(group_id);
@@ -88,6 +90,7 @@ on conflict (id) do nothing;
 alter table groups add column if not exists overdue_minutes int default 0;
 alter table groups add column if not exists duty_rotation text[] default '{}';
 alter table groups add column if not exists duty_anchor date;
+alter table groups add column if not exists last_recap_ym text;
 
 create table if not exists oneoff_reminders (
   id              bigserial primary key,
