@@ -1,18 +1,20 @@
 {
   "name": "gongyang-line-bot",
-  "version": "0.1.0",
-  "description": "共養日誌 LINE chatbot — 餵藥提醒/打卡 + 生命之書任務系統",
-  "main": "src/index.js",
+  "version": "1.0.0",
+  "description": "共養日誌 LINE bot v2 — 多寵物 / 多任務(餵藥·餵食·散步·自訂) / AI 助手 / 生命之書，跑在 Vercel + Supabase",
+  "private": true,
   "scripts": {
-    "start": "node src/index.js"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
-    "@line/bot-sdk": "^7.7.0",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "node-cron": "^3.0.3"
+    "@supabase/supabase-js": "^2.45.0",
+    "next": "^14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }
