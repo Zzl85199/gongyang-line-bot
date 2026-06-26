@@ -135,3 +135,28 @@ gongyang-line-bot/
 - `supabase/migration_005_cron.sql` — 每分鐘排程（記得先填 URL 與 CRON_SECRET、並開啟 pg_cron / pg_net 擴充）
 
 > 另外：截圖最上面那張 18:00 餵藥卡，文案與按鈕（「我餵了 ✅」「避免重複給藥」）跟現行 `lib/messages.js` 不一致，是**舊版送出的歷史訊息**，不是現在的設定。若 `tasks` 表還留著那筆舊餵藥任務，請用「刪除提醒」或在 DB 清掉。
+
+---
+
+## Phase 1 + Phase 2（2026-06）
+
+繼續壓在 LINE bot 上，把平台能力長到 bot 旁邊。**升級前請先在 Supabase SQL Editor 跑一次 `supabase/migration_006.sql`。**
+
+### Phase 1 — 補滿核心止痛藥
+1. **用藥劑量結構化**：`tasks.dosage` 獨立欄位（不再塞在名稱字串）。提醒卡、過時補提醒、提醒清單都會顯示「劑量：…」。AI 設定時直接講即可，例如「小幫手 幫哈吉設定腎臟藥 每次半顆 08:00,20:00」；`add_reminder` / `edit_reminder` 都支援 dosage。這筆資料之後會長成病史。
+2. **過時補提醒指名輪值者**：原本只在結尾附「今天輪到 X」，現在直接以對方開頭點名（「⚠️ 媽，哈吉的腎臟藥（20:00）還沒人完成，今天輪到你囉 🙋」），語氣更明確。沿用既有的 `duty_rotation`。
+3. **破壞性操作的最低防護**：刪除提醒、取消打卡、進入安寧/紀念一律走「確認卡」二次確認（既有機制）。在 LINE 群（家人皆可信任）情境下，暫不另建 owner/caregiver/viewer 角色系統。
+
+### Phase 2 — 情感黏著（Doc 4 基本迴圈）
+4. **每週自動丟任務**：靠修好的 cron，每週六 10:00 起，對每隻在養寵物各推一個互動小任務（每隻每週一次，`pets.last_task_week` 去重）。任務內容與語氣由狀態引擎決定。
+5. **照片圖鑑收集**：傳照片進群後，除了收進生命之書，還會用「快速回覆」問要不要收進某本圖鑑（睡姿/表情包/散步/合照…）。圖鑑目錄在 `lib/collections.js`，進度由 `lifebook.collection_key` 即時統計；指令「圖鑑」可看收集進度，集滿會慶祝（受狀態守門）。
+6. **顯式的寵物狀態 + 語氣/降檔系統**（`lib/petstate.js`，全專案最該謹慎的一塊）：
+   - 狀態：活力/陪伴/熟齡/療程/安寧/紀念，由 年齡＋病況＋`care_state`＋`archived` 推導。
+   - **硬規則（已用程式落實）**：紀念期停所有提醒與任務、絕不慶祝；安寧期仍發藥物提醒，但不自動丟任務、不慶祝、語氣最輕柔。
+   - 進入安寧是敏感轉換 → 一律確認卡 + 溫柔文案，不冷冰冰宣告。指令「安寧 哈吉」進入、「恢復照護 哈吉」結束；AI 也有 `enter_hospice` / `restore_care` / `show_collections`。
+   - 提醒：活動建議、每週任務、圖鑑集滿慶祝，全部統一走 `careTone()` 這個單一事實來源，未來要加任何慶祝動畫時天生就被守門。
+
+### 需要跑的 migration（Supabase SQL Editor）
+- `migration_004.sql`（對話記憶，前一批）
+- `migration_005_cron.sql`（每分鐘排程，前一批）
+- `migration_006.sql`（本批：dosage / care_state / last_task_week / collection_key）

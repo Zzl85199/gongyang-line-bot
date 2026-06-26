@@ -8,8 +8,10 @@ import { supa } from '../../../lib/supabase.js';
 import * as db from '../../../lib/db.js';
 import * as line from '../../../lib/line.js';
 import * as msg from '../../../lib/messages.js';
-import { hhmmTaipei, dateKeyTaipei } from '../../../lib/time.js';
+import { hhmmTaipei, dateKeyTaipei, weekKeyTaipei, weekdayTaipei } from '../../../lib/time.js';
 import { albumUrl } from '../../../lib/album.js';
+import { suggestActivity } from '../../../lib/activities.js';
+import { careTone } from '../../../lib/petstate.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -121,6 +123,33 @@ async function run() {
         }
       }
       await db.setLastRecapYm(g.id, ym); // 標記本月已處理，避免整天重複
+    }
+  }
+
+  // 5) 每週小任務：週六 10:00 起，當週還沒推過的寵物各推一個。
+  //    依寵物狀態語氣挑選（安寧不主動丟、紀念已被 listPets 排除）；每隻每週只推一次。
+  if (weekdayTaipei() === 6 && nowMin >= 10 * 60) {
+    const week = weekKeyTaipei();
+    for (const g of groupRows) {
+      const pets = await db.listPets(g.id); // 已排除紀念(archived)
+      for (const pet of pets) {
+        if (pet.last_task_week === week) continue;
+        const tone = careTone(pet);
+        if (!tone.autoTask) {
+          await db.setLastTaskWeek(pet.id, week); // 安寧：跳過但標記，免得每分鐘重查
+          continue;
+        }
+        const act = suggestActivity(pet);
+        if (act) {
+          try {
+            await line.push(g.id, msg.weeklyTask(pet, act));
+            pushed++;
+          } catch (e) {
+            console.error('push weekly task failed', e.message);
+          }
+        }
+        await db.setLastTaskWeek(pet.id, week);
+      }
     }
   }
 
