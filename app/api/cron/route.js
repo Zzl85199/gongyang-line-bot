@@ -125,6 +125,10 @@ async function run() {
   }
 
   return pushed;
+}
+
+// 排程器驗證：有設 CRON_SECRET 就要求 Bearer 或 ?key= 帶對；沒設則放行（方便本機測試）。
+function authorized(req) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return true;
   const auth = req.headers.get('authorization');

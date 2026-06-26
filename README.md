@@ -109,3 +109,29 @@ gongyang-line-bot/
 - 依寵物年齡 / 病況自動調整任務難度；離世後切換「紀念模式」（`pets.archived` 已預留）。
 - 生命之書自動編成月度回顧短片 / 可保存紀念冊。
 - 提醒未打卡的「過時補提醒」與家人輪值分工。
+
+---
+
+## 修補紀錄（2026-06 patch）
+
+這次修掉了「提醒不會發、AI 沒記憶、提醒可能沒設成功」三件事：
+
+1. **`/api/cron` 直接 500、提醒一封都發不出去（最關鍵）**
+   `app/api/cron/route.js` 裡 `run()` 在 `return pushed;` 後面黏了一段死碼，而 `authorized()` 這個函式根本沒被定義，`GET` 一呼叫就 `ReferenceError`。已把 `authorized()` 補成正式函式、刪掉死碼。
+
+2. **沒有任何排程器每分鐘打 `/api/cron`**
+   `vercel.json` 的 `crons` 是空的、`schema.sql` 的 pg_cron 區塊是註解掉的，所以就算 (1) 修好也沒人觸發。請執行新檔 **`supabase/migration_005_cron.sql`**（把 `<YOUR_VERCEL_URL>`、`<CRON_SECRET>` 換成你的值後，在 Supabase SQL Editor 跑一次）。跑完用 `select * from cron.job_run_details order by start_time desc limit 20;` 確認每分鐘有 200。
+
+3. **AI 沒有對話記憶**
+   舊版每次都只把「當前這句」丟給模型，所以你說「這樣沒問題」時它不知道指的是什麼（跟用 Gemini 或 Claude 無關）。新增 `chat_messages` 表（**`supabase/migration_004.sql`**），`lib/db.js` 加了 `saveChatMessage` / `recentChatMessages`，`lib/ai.js` 會載入該照護圈最近 10 句一起送進模型，並把每輪存回去。
+
+4. **提醒可能「沒設成功」/ 重複設定**
+   - 強化 system prompt：使用者回「好／可以／沒問題」時，模型要「立刻呼叫工具」把設定寫進去，而不是只回「我會幫你設定」。
+   - `add_reminder` 改為去重：同一隻寵物若已有同名提醒，會「更新時間」而非再插一筆，避免重複任務造成重複推播。
+   - 想確認到底設好沒，最可靠是打確定性指令 **「提醒清單」**。
+
+### 升級前必跑（Supabase SQL Editor，各跑一次）
+- `supabase/migration_004.sql` — 對話記憶表
+- `supabase/migration_005_cron.sql` — 每分鐘排程（記得先填 URL 與 CRON_SECRET、並開啟 pg_cron / pg_net 擴充）
+
+> 另外：截圖最上面那張 18:00 餵藥卡，文案與按鈕（「我餵了 ✅」「避免重複給藥」）跟現行 `lib/messages.js` 不一致，是**舊版送出的歷史訊息**，不是現在的設定。若 `tasks` 表還留著那筆舊餵藥任務，請用「刪除提醒」或在 DB 清掉。
