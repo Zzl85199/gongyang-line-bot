@@ -28,12 +28,35 @@ export default function AlbumManager({ groupId, pets, collectionsByPet, entriesB
   const [editing, setEditing] = useState(null);
   const [cap, setCap] = useState('');
   const [busy, setBusy] = useState(false);
+  const [upCaption, setUpCaption] = useState('');
+  const [upCol, setUpCol] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   if (!pets.length) return <div style={C.card}><span style={C.sub}>還沒有毛孩 🐾</span></div>;
 
   const cols = collectionsByPet[petId] || [];
   const colMeta = Object.fromEntries(cols.map((c) => [c.key, c]));
   const entries = (entriesByPet[petId] || []).filter((e) => filter === 'all' || e.collection_key === filter);
+
+  async function upload(file) {
+    if (!file) return;
+    setUploading(true);
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('groupId', groupId);
+    fd.append('petId', String(petId));
+    if (upCaption) fd.append('caption', upCaption);
+    if (upCol) fd.append('collectionKey', upCol);
+    try {
+      const r = await fetch('/api/app/photo', { method: 'POST', body: fd });
+      const j = await r.json();
+      if (j.ok) { setUpCaption(''); router.refresh(); }
+      else alert(j.error === 'too_big' ? '檔案太大（上限 8MB）' : '上傳失敗：' + j.error);
+    } catch {
+      alert('上傳失敗，請再試一次');
+    }
+    setUploading(false);
+  }
 
   async function saveCap(id) {
     setBusy(true);
@@ -75,6 +98,23 @@ export default function AlbumManager({ groupId, pets, collectionsByPet, entriesB
           <button key={c.key} style={C.chip(filter === c.key)} onClick={() => setFilter(c.key)}>{c.emoji} {c.title} {c.count}</button>
         ))}
       </div>
+
+      {canEdit && (
+        <div style={C.card}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 8px' }}>上傳照片</h2>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <input style={C.input} placeholder="說明（選填）" value={upCaption} onChange={(e) => setUpCaption(e.target.value)} />
+            <select style={C.input} value={upCol} onChange={(e) => setUpCol(e.target.value)}>
+              <option value="">先不分類</option>
+              {cols.map((c) => <option key={c.key} value={c.key}>{c.emoji} {c.title}</option>)}
+            </select>
+            <label style={{ ...C.btn, display: 'inline-block', textAlign: 'center', opacity: uploading ? 0.5 : 1 }}>
+              {uploading ? '上傳中…' : '＋ 選擇照片上傳'}
+              <input type="file" accept="image/*" style={{ display: 'none' }} disabled={uploading} onChange={(e) => upload(e.target.files?.[0])} />
+            </label>
+          </div>
+        </div>
+      )}
 
       {filter !== 'all' && canEdit && colMeta[filter]?.kind === 'series' && (
         <div style={{ marginBottom: 14 }}>

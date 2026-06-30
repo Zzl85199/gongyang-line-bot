@@ -26,7 +26,7 @@ export default async function PetsPage({ params }) {
         id: p.id, name: p.name, species: p.species, birthday: p.birthday,
         health: p.health, archived: p.archived, care_state: p.care_state, handoff_config: p.handoff_config,
       }))}
-      group={{ duty_rotation: group.duty_rotation || [], overdue_minutes: group.overdue_minutes || 0 }}
+      group={{ duty_rotation: group.duty_rotation || [], overdue_minutes: group.overdue_minutes || 0, timezone: group.timezone || 'Asia/Taipei' }}
       handoffUrls={handoffUrls}
     />
   );

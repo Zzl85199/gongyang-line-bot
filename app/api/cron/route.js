@@ -8,7 +8,7 @@ import { supa } from '../../../lib/supabase.js';
 import * as db from '../../../lib/db.js';
 import * as line from '../../../lib/line.js';
 import * as msg from '../../../lib/messages.js';
-import { hhmmTaipei, dateKeyTaipei, weekKeyTaipei, weekdayTaipei } from '../../../lib/time.js';
+import { hhmmTaipei, dateKeyTaipei, weekKeyTaipei, weekdayTaipei, hhmmInTz, dateKeyInTz, weekdayInTz, weekKeyInTz } from '../../../lib/time.js';
 import { albumUrl } from '../../../lib/album.js';
 import { suggestActivity } from '../../../lib/activities.js';
 import { careTone } from '../../../lib/petstate.js';
@@ -27,9 +27,9 @@ const toMin = (hhmm) => {
 const GRACE = Number(process.env.REMINDER_GRACE_MIN || 5);
 
 async function run() {
-  const now = hhmmTaipei();
-  const nowMin = toMin(now);
-  const today = dateKeyTaipei();
+  const nowDate = new Date();
+  const now = hhmmTaipei(nowDate); // 預設台北（給沒設時區的群與月度判斷用）
+  const today = dateKeyTaipei(nowDate);
 
   const { data: tasks } = await supa
     .from('tasks')
@@ -39,6 +39,17 @@ async function run() {
   const groupRows = await db.allGroupRows();
   const groupMap = Object.fromEntries(groupRows.map((g) => [g.id, g]));
 
+  // 每個照護圈用自己的時區算「現在」，提醒才會在當地時間到點時觸發
+  const clockFor = (groupId) => {
+    const tz = groupMap[groupId]?.timezone || 'Asia/Taipei';
+    return {
+      tz,
+      now: hhmmInTz(nowDate, tz),
+      nowMin: toMin(hhmmInTz(nowDate, tz)),
+      today: dateKeyInTz(nowDate, tz),
+    };
+  };
+
   let pushed = 0;
 
   for (const task of tasks || []) {
@@ -47,9 +58,10 @@ async function run() {
     const g = groupMap[task.group_id];
     const duty = g ? db.dutyToday(g) : null;
     const od = g?.overdue_minutes || 0;
+    const clk = clockFor(task.group_id);
 
     for (const slot of task.times || []) {
-      const lag = nowMin - toMin(slot); // 現在比這一槽晚幾分鐘
+      const lag = clk.nowMin - toMin(slot); // 以該圈所在時區計算「現在比這一槽晚幾分鐘」
       // 1) 到點提醒：到點或剛過點 GRACE 分鐘內都補發（去重保證只發一次）
       if (lag >= 0 && lag <= GRACE && (await db.claimReminder(task, slot))) {
         try {
@@ -61,9 +73,9 @@ async function run() {
       }
       // 3) 過時補提醒
       if (od > 0) {
-        const elapsed = nowMin - toMin(slot);
+        const elapsed = clk.nowMin - toMin(slot);
         if (elapsed >= od && elapsed < od + 60) {
-          const done = await db.getLog(task.id, slot, today);
+          const done = await db.getLog(task.id, slot, clk.today);
           if (!done && (await db.claimOverdue(task, slot))) {
             try {
               await line.push(task.group_id, msg.overdueReminder(pet, task, slot, duty));
@@ -134,28 +146,28 @@ async function run() {
 
   // 5) 每週小任務：週六 10:00 起，當週還沒推過的寵物各推一個。
   //    依寵物狀態語氣挑選（安寧不主動丟、紀念已被 listPets 排除）；每隻每週只推一次。
-  if (weekdayTaipei() === 6 && nowMin >= 10 * 60) {
-    const week = weekKeyTaipei();
-    for (const g of groupRows) {
-      const pets = await db.listPets(g.id); // 已排除紀念(archived)
-      for (const pet of pets) {
-        if (pet.last_task_week === week) continue;
-        const tone = careTone(pet);
-        if (!tone.autoTask) {
-          await db.setLastTaskWeek(pet.id, week); // 安寧：跳過但標記，免得每分鐘重查
-          continue;
-        }
-        const act = suggestActivity(pet);
-        if (act) {
-          try {
-            await line.push(g.id, msg.weeklyTask(pet, act));
-            pushed++;
-          } catch (e) {
-            console.error('push weekly task failed', e.message);
-          }
-        }
-        await db.setLastTaskWeek(pet.id, week);
+  for (const g of groupRows) {
+    const tz = g.timezone || 'Asia/Taipei';
+    if (!(weekdayInTz(nowDate, tz) === 6 && toMin(hhmmInTz(nowDate, tz)) >= 10 * 60)) continue;
+    const week = weekKeyInTz(nowDate, tz);
+    const pets = await db.listPets(g.id); // 已排除紀念(archived)
+    for (const pet of pets) {
+      if (pet.last_task_week === week) continue;
+      const tone = careTone(pet);
+      if (!tone.autoTask) {
+        await db.setLastTaskWeek(pet.id, week); // 安寧：跳過但標記，免得每分鐘重查
+        continue;
       }
+      const act = suggestActivity(pet);
+      if (act) {
+        try {
+          await line.push(g.id, msg.weeklyTask(pet, act));
+          pushed++;
+        } catch (e) {
+          console.error('push weekly task failed', e.message);
+        }
+      }
+      await db.setLastTaskWeek(pet.id, week);
     }
   }
 

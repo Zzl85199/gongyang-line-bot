@@ -323,3 +323,19 @@ gongyang-line-bot/
 
 ### 要跑的 migration
 - `migration_010_web_phase5.sql`（本批：walk_logs / pets.handoff_config）
+
+---
+
+## Phase 5 補強（2026-06）：時區 / 相簿上傳 / 散步一鍵 / 健康分類
+
+**升級前先在 Supabase SQL Editor 跑一次 `supabase/migration_011_timezone.sql`。**
+
+1. **照護圈時區**：每個照護圈可在「毛孩檔案 → 照護圈設定」選時區（預設台北）。提醒到點比對改用該時區，解決「毛孩/家人不在台灣時提醒時間錯亂」。
+   - ⚠️ 注意：時區只影響「提醒何時觸發」。若提醒**整個沒發**，幾乎都是「每分鐘呼叫 `/api/cron` 的排程器沒在跑」，跟時區無關。**自測法**：瀏覽器直接開 `https://你的網址/api/cron?key=你的CRON_SECRET`，應回 `{"ok":true,"pushed":N}`；在當下這分鐘新增一個提醒再開一次，應該就會推。會手動推、但排程不推 → 是 Supabase `pg_cron`（migration_005）的 URL/secret/擴充沒設好。
+2. **相簿可上傳**：相簿頁新增「上傳照片」（可選說明與圖鑑），照顧者以上可用；刪除仍限主飼主。
+3. **散步更好記**：LINE 群直接打「**遛狗**」（不必帶參數）就記一筆，再**點一下心情**即可，並回「本週第 N 次 🎉」給成就感；傳照片時的快速回覆多了「🦮 這是散步」一鍵把照片同時記成散步。心情/取消都用按鈕（增＝遛狗、刪＝取消這筆、改＝點心情、查＝散步紀錄）。
+4. **健康時間軸可分類**：時間軸上方可切「全部 / 體重 / 食慾 / 症狀 / 備註」。
+
+### 要跑的 migration
+- `migration_010_web_phase5.sql`（walk_logs / handoff_config）
+- `migration_011_timezone.sql`（groups.timezone）

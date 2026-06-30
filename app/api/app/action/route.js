@@ -321,6 +321,18 @@ export async function POST(req) {
         await db.setOverdueMinutes(groupId, mins);
         return ok();
       }
+      case 'group.timezone': {
+        if (!needManage()) return no('forbidden', 403);
+        const tz = (body.timezone || '').trim();
+        // 基本驗證：必須是合法 IANA 時區字串
+        try {
+          new Intl.DateTimeFormat('en-US', { timeZone: tz });
+        } catch {
+          return no('bad_tz');
+        }
+        await db.setTimezone(groupId, tz);
+        return ok();
+      }
 
       default:
         return no('unknown_kind');

@@ -145,6 +145,7 @@ export default function PetsManager({ groupId, pets, group, handoffUrls }) {
   const [n, setN] = useState({ name: '', species: '', birthday: '', health: '' });
   const [duty, setDuty] = useState((group.duty_rotation || []).join(' '));
   const [overdue, setOverdue] = useState(group.overdue_minutes || 0);
+  const [tz, setTz] = useState(group.timezone || 'Asia/Taipei');
   const [busy, setBusy] = useState(false);
 
   async function addPet() {
@@ -161,6 +162,10 @@ export default function PetsManager({ groupId, pets, group, handoffUrls }) {
   async function saveOverdue() {
     const j = await action({ groupId, kind: 'group.overdue', minutes: overdue });
     if (j.ok) alert('已更新'); else alert('失敗：' + j.error);
+  }
+  async function saveTz() {
+    const j = await action({ groupId, kind: 'group.timezone', timezone: tz });
+    if (j.ok) alert('時區已更新，提醒會依這個時區到點觸發'); else alert('失敗：' + j.error);
   }
 
   return (
@@ -186,6 +191,22 @@ export default function PetsManager({ groupId, pets, group, handoffUrls }) {
 
       <div style={C.card}>
         <h2 style={C.h2}>照護圈設定</h2>
+        <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+          <label style={C.sub}>時區（提醒會依這個時區到點觸發；毛孩在哪個國家就選哪個）</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <select style={C.input} value={tz} onChange={(e) => setTz(e.target.value)}>
+              <option value="Asia/Taipei">台灣 / 香港（Asia/Taipei）</option>
+              <option value="Asia/Tokyo">日本（Asia/Tokyo）</option>
+              <option value="Asia/Shanghai">中國（Asia/Shanghai）</option>
+              <option value="Asia/Singapore">新加坡 / 馬來西亞（Asia/Singapore）</option>
+              <option value="America/Los_Angeles">美西（America/Los_Angeles）</option>
+              <option value="America/New_York">美東（America/New_York）</option>
+              <option value="Europe/London">英國（Europe/London）</option>
+              <option value="Australia/Sydney">雪梨（Australia/Sydney）</option>
+            </select>
+            <button style={C.ghost} onClick={saveTz}>儲存</button>
+          </div>
+        </div>
         <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
           <label style={C.sub}>輪值名單（每天輪一位，空白或逗號分隔）</label>
           <div style={{ display: 'flex', gap: 8 }}>

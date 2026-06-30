@@ -64,6 +64,7 @@ export default function HealthManager({ groupId, pets, logsByPet, canEdit }) {
   const [val, setVal] = useState('');
   const [editing, setEditing] = useState(null); // log id
   const [editVal, setEditVal] = useState('');
+  const [tlFilter, setTlFilter] = useState('all');
   const [busy, setBusy] = useState(false);
 
   if (!pets.length) return <div style={C.card}><span style={C.sub}>還沒有毛孩。先到「毛孩檔案」或 LINE 群裡新增一隻 🐾</span></div>;
@@ -131,11 +132,17 @@ export default function HealthManager({ groupId, pets, logsByPet, canEdit }) {
       )}
 
       <div style={C.card}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px' }}>時間軸</h2>
-        {logs.length === 0 ? (
-          <span style={C.sub}>還沒有任何紀錄。</span>
-        ) : (
-          logs.map((l) => {
+        <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 10px' }}>時間軸</h2>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+          <button style={C.tab(tlFilter === 'all')} onClick={() => setTlFilter('all')}>全部</button>
+          {Object.entries(KIND).map(([k, v]) => (
+            <button key={k} style={C.tab(tlFilter === k)} onClick={() => setTlFilter(k)}>{v.e} {v.l}</button>
+          ))}
+        </div>
+        {(() => {
+          const shown = logs.filter((l) => tlFilter === 'all' || l.kind === tlFilter);
+          if (shown.length === 0) return <span style={C.sub}>{tlFilter === 'all' ? '還沒有任何紀錄。' : '這個分類還沒有紀錄。'}</span>;
+          return shown.map((l) => {
             const meta = KIND[l.kind] || KIND.note;
             const display = l.kind === 'weight' ? `${l.value_num} kg` : l.value_text || '';
             return (
@@ -169,8 +176,8 @@ export default function HealthManager({ groupId, pets, logsByPet, canEdit }) {
                 </div>
               </div>
             );
-          })
-        )}
+          });
+        })()}
       </div>
       {!canEdit && <p style={C.sub}>你目前是唯讀身分，看得到紀錄但不能編輯。</p>}
     </div>
