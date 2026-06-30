@@ -300,3 +300,26 @@ gongyang-line-bot/
 
 ### 要跑的 migration
 - `migration_009_webapp.sql`（本批：app_users / access_grants / 從 members 回填）
+
+---
+
+## Phase 5（網頁五大功能，2026-06）
+
+**升級前先在 Supabase SQL Editor 跑一次 `supabase/migration_010_web_phase5.sql`。**（新增 `walk_logs` 表與 `pets.handoff_config`）
+
+網頁後台多了五塊，全部依角色把關（唯讀只能看、照顧者可增刪改、主飼主可管檔案與授權）：
+
+1. **健康 `/app/[groupId]/health`**：體重折線圖（內建輕量 SVG，不依賴圖表套件）+ 食慾／症狀／備註時間軸，可新增/編輯/刪除。
+2. **交接卡（可列印）`/handoff/[petId]?k=token`**：乾淨、可列印（瀏覽器「列印→存成 PDF」）的一頁摘要，不需登入、用 token 防護，適合丟給保母／獸醫。**要顯示哪些區塊**（基本/提醒/今天/體重/狀況/散步/聯絡）由飼主在「毛孩檔案」勾選；分享連結也在那裡產生。
+3. **相簿 / 圖鑑 `/app/[groupId]/album`**：依圖鑑分類瀏覽照片，可改說明、改分類、刪除（刪除限主飼主，會連同 Storage 圖檔一起刪），並可一鍵把某本圖鑑的**回顧**推回 LINE 群。
+4. **達成率 `/app/[groupId]/stats` + 散步日誌 `/app/[groupId]/walks`**：本週每個提醒「應完成/實際完成」與達成率長條圖；散步日誌記地點/心情/時間，可在網頁增刪改查，LINE 也能打「遛 哈吉 河堤 開心」記一筆、「散步紀錄 哈吉」查看。
+5. **毛孩檔案 `/app/[groupId]/pets`（主飼主）**：新增/編輯毛孩（名字/品種/生日/病況）、狀態切換（一般 / 安寧 / 紀念，敏感操作會二次確認）、交接卡設定，以及照護圈設定（輪值名單、過時補提醒分鐘數）。
+
+### 新增的 LINE 指令
+| 指令 | 說明 |
+|---|---|
+| `遛 哈吉 河堤 開心` / `遛狗 河堤` / `散步打卡 …` | 記一筆散步（地點 心情） |
+| `散步紀錄 哈吉` / `散步日誌` | 看最近的散步紀錄 |
+
+### 要跑的 migration
+- `migration_010_web_phase5.sql`（本批：walk_logs / pets.handoff_config）

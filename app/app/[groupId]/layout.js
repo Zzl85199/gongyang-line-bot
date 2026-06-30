@@ -24,7 +24,12 @@ export default async function GroupLayout({ children, params }) {
   const tabs = [
     { href: `/app/${groupId}`, label: '今天' },
     { href: `/app/${groupId}/schedule`, label: '排程' },
+    { href: `/app/${groupId}/health`, label: '健康' },
+    { href: `/app/${groupId}/walks`, label: '散步' },
+    { href: `/app/${groupId}/album`, label: '相簿' },
+    { href: `/app/${groupId}/stats`, label: '統計' },
   ];
+  if (isManager) tabs.push({ href: `/app/${groupId}/pets`, label: '毛孩檔案' });
   if (isManager) tabs.push({ href: `/app/${groupId}/members`, label: '成員 / 授權' });
 
   return (
@@ -38,9 +43,9 @@ export default async function GroupLayout({ children, params }) {
             </div>
             <a href="/api/auth/logout" style={{ ...sub, color: colors.brand }}>登出</a>
           </div>
-          <nav style={{ display: 'flex', gap: 18, marginTop: 10 }}>
+          <nav style={{ display: 'flex', gap: 18, marginTop: 10, overflowX: 'auto', whiteSpace: 'nowrap' }}>
             {tabs.map((t) => (
-              <a key={t.href} href={t.href} style={{ textDecoration: 'none', color: colors.ink, fontSize: 14, padding: '8px 0', fontWeight: 600 }}>
+              <a key={t.href} href={t.href} style={{ textDecoration: 'none', color: colors.ink, fontSize: 14, padding: '8px 0', fontWeight: 600, flex: '0 0 auto' }}>
                 {t.label}
               </a>
             ))}
