@@ -21,6 +21,11 @@ const toMin = (hhmm) => {
   return h * 60 + m;
 };
 
+// 到點容錯窗（分鐘）：排程器若慢了幾秒、冷啟動延遲、或漏跑一兩分鐘，
+// 只要在「到點後 GRACE 分鐘內」這一槽都還會補發一次。claimReminder 以 DB 唯一鍵去重，
+// 所以就算每分鐘都進到這個窗，也保證一槽一天只發一次，不會重複轟炸。
+const GRACE = Number(process.env.REMINDER_GRACE_MIN || 5);
+
 async function run() {
   const now = hhmmTaipei();
   const nowMin = toMin(now);
@@ -44,8 +49,9 @@ async function run() {
     const od = g?.overdue_minutes || 0;
 
     for (const slot of task.times || []) {
-      // 1) 到點提醒
-      if (slot === now && (await db.claimReminder(task, slot))) {
+      const lag = nowMin - toMin(slot); // 現在比這一槽晚幾分鐘
+      // 1) 到點提醒：到點或剛過點 GRACE 分鐘內都補發（去重保證只發一次）
+      if (lag >= 0 && lag <= GRACE && (await db.claimReminder(task, slot))) {
         try {
           await line.push(task.group_id, msg.reminder(pet, task, slot, duty));
           pushed++;

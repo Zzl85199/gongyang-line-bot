@@ -273,3 +273,30 @@ gongyang-line-bot/
 
 ### 需要跑的 migration
 - `migration_008.sql`（custom_collections + tasks 庫存欄位）
+
+---
+
+## Phase 4 + 三個修補（2026-06）
+
+**升級前先在 Supabase SQL Editor 跑一次 `supabase/migration_009_webapp.sql`。**
+
+### 這次修掉的三件事
+1. **無分母系列不再報「第 N 張」**：平常收照片只回「已收進某圖鑑 📚」，到 5/10/20… 的柔性里程碑才慶祝並自動拼回顧卡（`lib/messages.js` 的 `collectionFiled`）。
+2. **小任務卡找回「換一個 / 簡單一點 / 想動一動」**：抽到做不到的可直接換掉。`suggestActivity` 支援指定難度（會被寵物狀態夾住，安寧/療程只給溫和的），卡片下方加了快速回覆按鈕，`handlers.js` 新增 `a=task` postback。
+3. **提醒到點不發 → 加容錯窗**：`/api/cron` 不再要求「分秒剛好對上」，到點後 `REMINDER_GRACE_MIN`（預設 5）分鐘內都會補發一次；DB 唯一鍵去重保證一槽一天只發一次。
+   - ⚠️ 仍要有人「每分鐘」打 `/api/cron`。若提醒整個沒動，先確認 `migration_005_cron.sql` 有跑、URL/`CRON_SECRET` 正確，並用 `select * from cron.job_run_details order by start_time desc limit 20;` 看每分鐘是不是 200。
+
+### Phase 4 — 網頁後台
+跑在同一個 Next.js 專案（`/app`）。功能：
+- **帳號**：可用 **LINE 登入**或 **Email 註冊**。`migration_009` 會從現有 `members` 回填 `app_users`。
+- **存取模型（也是「更好的辦法」）**：把 **LINE Login channel 放在跟 Messaging API 同一個 Provider**，回傳的 `userId` 就會和機器人看到的一致 → 家人一登入自動對上自己照顧的毛孩，**預設都是主飼主（owner）**，不必再邀請。
+- **對外授權**：主飼主可產生**邀請連結**開放給群外的人（獸醫／保母），預設唯讀、可隨時撤銷（`access_grants`）。對方點連結 → 登入/註冊 → 啟用。
+- **頁面**：`今天`（每個時段一鍵打卡，全家同步）、`排程`（新增/改時間或劑量/刪除提醒的管理表）、`成員 / 授權`（角色把關開關、調整家人角色、產生/撤銷邀請）。
+
+### 需要的環境變數（新增，見 `.env.example`）
+- `AUTH_SECRET`（session 簽章；不填退回用 `CRON_SECRET`）
+- `LINE_LOGIN_CHANNEL_ID` / `LINE_LOGIN_CHANNEL_SECRET`（LINE 登入；Callback 設 `https://你的網址/api/auth/line/callback`）
+- `REMINDER_GRACE_MIN`（選填，預設 5）
+
+### 要跑的 migration
+- `migration_009_webapp.sql`（本批：app_users / access_grants / 從 members 回填）
