@@ -17,23 +17,22 @@ export default function TodayBoard({ groupId, initialPets, canCheckin }) {
   const [pets, setPets] = useState(initialPets);
   const [busy, setBusy] = useState(null);
 
-  async function toggle(petIdx, taskIdx, slotIdx) {
+  async function toggle(petIdx, itemIdx) {
     if (!canCheckin) return;
-    const slot = pets[petIdx].tasks[taskIdx].slots[slotIdx];
-    const key = `${petIdx}-${taskIdx}-${slotIdx}`;
+    const item = pets[petIdx].items[itemIdx];
+    const key = `${petIdx}-${itemIdx}`;
     setBusy(key);
-    const task = pets[petIdx].tasks[taskIdx];
-    const kind = slot.done ? 'checkin.undo' : 'checkin.done';
+    const kind = item.done ? 'checkin.undo' : 'checkin.done';
     try {
       const r = await fetch('/api/app/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groupId, kind, taskId: task.id, slot: slot.time }),
+        body: JSON.stringify({ groupId, kind, taskId: item.taskId, slot: item.time }),
       });
       const j = await r.json();
       if (j.ok) {
         const copy = structuredClone(pets);
-        copy[petIdx].tasks[taskIdx].slots[slotIdx].done = !slot.done;
+        copy[petIdx].items[itemIdx].done = !item.done;
         setPets(copy);
       }
     } catch {
@@ -54,33 +53,29 @@ export default function TodayBoard({ groupId, initialPets, canCheckin }) {
               <a href={pet.albumUrl} target="_blank" rel="noreferrer" style={{ ...C.sub, color: '#2f7d5b' }}>生命之書 →</a>
             )}
           </div>
-          {pet.tasks.length === 0 ? (
+          {pet.items.length === 0 ? (
             <span style={C.sub}>今天沒有排定的提醒。</span>
           ) : (
-            pet.tasks.map((task, ti) => (
-              <div key={task.id}>
-                {task.slots.map((slot, si) => {
-                  const key = `${pi}-${ti}-${si}`;
-                  return (
-                    <div key={si} style={C.row}>
-                      <div>
-                        <span style={{ marginRight: 8 }}>{task.emoji || '⏰'}</span>
-                        <span style={{ fontWeight: 600 }}>{task.name}</span>
-                        <span style={{ ...C.sub, marginLeft: 8 }}>{slot.time}{task.dosage ? `・${task.dosage}` : ''}</span>
-                        {slot.done && slot.byName && <span style={{ ...C.sub, marginLeft: 8 }}>· {slot.byName}</span>}
-                      </div>
-                      <button
-                        onClick={() => toggle(pi, ti, si)}
-                        disabled={!canCheckin || busy === key}
-                        style={{ ...C.pill, ...(slot.done ? C.done : C.todo), opacity: busy === key ? 0.5 : 1, cursor: canCheckin ? 'pointer' : 'default' }}
-                      >
-                        {slot.done ? '已完成 ✓' : '完成'}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            ))
+            pet.items.map((item, ii) => {
+              const key = `${pi}-${ii}`;
+              return (
+                <div key={`${item.taskId}-${item.time}`} style={C.row}>
+                  <div>
+                    <span style={{ marginRight: 8 }}>{item.emoji || '⏰'}</span>
+                    <span style={{ fontWeight: 600 }}>{item.name}</span>
+                    <span style={{ ...C.sub, marginLeft: 8 }}>{item.time}{item.dosage ? `・${item.dosage}` : ''}</span>
+                    {item.done && item.byName && <span style={{ ...C.sub, marginLeft: 8 }}>· {item.byName}</span>}
+                  </div>
+                  <button
+                    onClick={() => toggle(pi, ii)}
+                    disabled={!canCheckin || busy === key}
+                    style={{ ...C.pill, ...(item.done ? C.done : C.todo), opacity: busy === key ? 0.5 : 1, cursor: canCheckin ? 'pointer' : 'default' }}
+                  >
+                    {item.done ? '已完成 ✓' : '完成'}
+                  </button>
+                </div>
+              );
+            })
           )}
         </div>
       ))}

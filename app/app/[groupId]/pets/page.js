@@ -15,8 +15,11 @@ export default async function PetsPage({ params }) {
   const access = await webdb.effectiveAccess(groupId, user);
   if (!webdb.canManage(access)) redirect(`/app/${groupId}`);
 
-  const pets = await db.listAllPets(groupId);
-  const group = await db.getOrCreateGroup(groupId);
+  const [pets, group, members] = await Promise.all([
+    db.listAllPets(groupId),
+    db.getOrCreateGroup(groupId),
+    db.listMembers(groupId),
+  ]);
   const handoffUrls = Object.fromEntries(pets.map((p) => [p.id, handoffUrl(p.id)]));
 
   return (
@@ -27,6 +30,7 @@ export default async function PetsPage({ params }) {
         health: p.health, archived: p.archived, care_state: p.care_state, handoff_config: p.handoff_config,
       }))}
       group={{ duty_rotation: group.duty_rotation || [], overdue_minutes: group.overdue_minutes || 0, timezone: group.timezone || 'Asia/Taipei' }}
+      members={members.map((m) => m.display_name).filter(Boolean)}
       handoffUrls={handoffUrls}
     />
   );

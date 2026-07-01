@@ -41,7 +41,10 @@ export default async function GroupLayout({ children, params }) {
               <a href="/app" style={{ textDecoration: 'none', color: colors.ink, fontWeight: 700 }}>🐾 {label}</a>
               <span style={roleBadge(access.role)}>{ROLE_LABEL[access.role] || access.role}</span>
             </div>
-            <a href="/api/auth/logout" style={{ ...sub, color: colors.brand }}>登出</a>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <a href="/community" style={{ ...sub, color: colors.brand, textDecoration: 'none' }}>🌐 社群</a>
+              <a href="/api/auth/logout" style={{ ...sub, color: colors.brand }}>登出</a>
+            </div>
           </div>
           <nav style={{ display: 'flex', gap: 18, marginTop: 10, overflowX: 'auto', whiteSpace: 'nowrap' }}>
             {tabs.map((t) => (

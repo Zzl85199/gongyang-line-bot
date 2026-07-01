@@ -23,6 +23,7 @@ export default async function AppHome() {
             <h1 style={h1}>嗨，{user.display_name || user.email || '你好'} 🐾</h1>
             <p style={sub}>選一個照護圈進去看看</p>
           </div>
+          <a href="/community" style={{ ...sub, color: colors.brand, textDecoration: 'none' }}>🌐 社群</a>
           <a href="/api/auth/logout" style={{ ...sub, color: colors.brand }}>登出</a>
         </div>
 

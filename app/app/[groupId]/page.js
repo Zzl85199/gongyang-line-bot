@@ -24,24 +24,27 @@ export default async function Today({ params }) {
   for (const l of logs) doneMap.set(`${l.task_id}|${l.scheduled_time}`, { byName: l.done_by_name, at: fmtTaipeiHHMM(l.done_at) });
 
   const data = pets.map((pet) => {
-    const petTasks = tasks
-      .filter((t) => t.pet_id === pet.id)
-      .map((t) => ({
-        id: t.id,
-        name: t.name,
-        emoji: t.emoji,
-        dosage: t.dosage || null,
-        slots: (t.times || [])
-          .slice()
-          .sort()
-          .map((time) => {
-            const hit = doneMap.get(`${t.id}|${time}`);
-            return { time, done: Boolean(hit), byName: hit?.byName || null };
-          }),
-      }))
-      .filter((t) => t.slots.length);
+    const petTasks = tasks.filter((t) => t.pet_id === pet.id);
+    // 攤平成「這隻毛孩今天所有時段」的單一陣列，再依時間排序——
+    // 之前是「一個提醒排完接著排下一個提醒」，同一隻毛孩不同提醒的時段不會照時間先後顯示。
+    const items = [];
+    for (const t of petTasks) {
+      for (const time of (t.times || []).slice().sort()) {
+        const hit = doneMap.get(`${t.id}|${time}`);
+        items.push({
+          taskId: t.id,
+          name: t.name,
+          emoji: t.emoji,
+          dosage: t.dosage || null,
+          time,
+          done: Boolean(hit),
+          byName: hit?.byName || null,
+        });
+      }
+    }
+    items.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
     const url = albumUrl(pet.id);
-    return { id: pet.id, name: pet.name, archived: pet.archived, albumUrl: url.startsWith('http') ? url : null, tasks: petTasks };
+    return { id: pet.id, name: pet.name, archived: pet.archived, albumUrl: url.startsWith('http') ? url : null, items };
   });
 
   const today = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', month: 'long', day: 'numeric', weekday: 'short' }).format(new Date());

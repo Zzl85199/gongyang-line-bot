@@ -39,6 +39,8 @@ function PetCard({ groupId, pet, handoffUrl }) {
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({ name: pet.name, species: pet.species || '', birthday: pet.birthday || '', health: pet.health || '' });
   const [cfg, setCfg] = useState(pet.handoff_config || Object.fromEntries(HANDOFF_SECTIONS.map(([k]) => [k, true])));
+  const [pub, setPub] = useState(Boolean(pet.public));
+  const [bio, setBio] = useState(pet.public_bio || '');
   const [busy, setBusy] = useState(false);
 
   async function save() {
@@ -46,6 +48,15 @@ function PetCard({ groupId, pet, handoffUrl }) {
     const j = await action({ groupId, kind: 'pet.update', petId: pet.id, ...f });
     setBusy(false);
     if (j.ok) { setOpen(false); router.refresh(); } else alert('更新失敗：' + j.error);
+  }
+  async function savePublic(nextPub) {
+    setPub(nextPub);
+    const j = await action({ groupId, kind: 'pet.public', petId: pet.id, public: nextPub, bio });
+    if (!j.ok) { setPub(!nextPub); alert('失敗：' + j.error); }
+  }
+  async function saveBio() {
+    const j = await action({ groupId, kind: 'pet.public', petId: pet.id, public: pub, bio });
+    if (j.ok) alert('社群簡介已更新'); else alert('失敗：' + j.error);
   }
   async function setState(state, label) {
     if (!confirm(`確定把 ${pet.name} 切到「${label}」嗎？`)) return;
@@ -74,6 +85,7 @@ function PetCard({ groupId, pet, handoffUrl }) {
         <div>
           <span style={{ fontSize: 17, fontWeight: 700, marginRight: 8 }}>{pet.name}</span>
           {stateBadge(pet)}
+          {pub && <span style={{ ...C.badge('#eef2ff', '#4338ca'), marginLeft: 6 }}>已公開到社群</span>}
           <div style={{ ...C.sub, marginTop: 4 }}>
             {[pet.species || '毛孩', pet.birthday ? `生日 ${pet.birthday}` : null, pet.health ? `狀況：${pet.health}` : null].filter(Boolean).join('・')}
           </div>
@@ -133,17 +145,35 @@ function PetCard({ groupId, pet, handoffUrl }) {
             </div>
             <div style={{ ...C.sub, marginTop: 6 }}>把連結傳給保母／獸醫即可，不需登入；列印時用瀏覽器「列印 → 存成 PDF」。</div>
           </div>
+
+          <div style={{ borderTop: '1px solid #f1f2f4', paddingTop: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input type="checkbox" checked={pub} onChange={(e) => savePublic(e.target.checked)} />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>公開到社群</span>
+              </label>
+            </div>
+            <div style={{ ...C.sub, marginBottom: 8 }}>開啟後，{pet.name} 才能在社群發文，其他飼主也能看到牠的公開主頁（名字/照片/簡介，不含照護圈裡的健康紀錄等私密資料）。</div>
+            {pub && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <input style={C.input} placeholder="社群簡介，例：愛睡覺的柴犬，最喜歡河堤散步" value={bio} onChange={(e) => setBio(e.target.value)} />
+                <button style={C.ghost} onClick={saveBio}>儲存簡介</button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-export default function PetsManager({ groupId, pets, group, handoffUrls }) {
+export default function PetsManager({ groupId, pets, group, members = [], handoffUrls }) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [n, setN] = useState({ name: '', species: '', birthday: '', health: '' });
-  const [duty, setDuty] = useState((group.duty_rotation || []).join(' '));
+  const [duty, setDuty] = useState(group.duty_rotation || []);
+  const [dutyPick, setDutyPick] = useState('');
+  const [dutyCustom, setDutyCustom] = useState('');
   const [overdue, setOverdue] = useState(group.overdue_minutes || 0);
   const [tz, setTz] = useState(group.timezone || 'Asia/Taipei');
   const [busy, setBusy] = useState(false);
@@ -155,8 +185,23 @@ export default function PetsManager({ groupId, pets, group, handoffUrls }) {
     setBusy(false);
     if (j.ok) { setN({ name: '', species: '', birthday: '', health: '' }); setAdding(false); router.refresh(); } else alert('新增失敗：' + j.error);
   }
+  function addDuty(nameRaw) {
+    const name = nameRaw.trim();
+    if (!name || duty.includes(name)) return;
+    setDuty([...duty, name]);
+  }
+  function removeDuty(name) {
+    setDuty(duty.filter((d) => d !== name));
+  }
+  function moveDuty(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= duty.length) return;
+    const copy = duty.slice();
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+    setDuty(copy);
+  }
   async function saveDuty() {
-    const j = await action({ groupId, kind: 'group.duty', names: duty });
+    const j = await action({ groupId, kind: 'group.duty', names: duty.join(',') });
     if (j.ok) alert('輪值名單已更新'); else alert('失敗：' + j.error);
   }
   async function saveOverdue() {
@@ -167,6 +212,7 @@ export default function PetsManager({ groupId, pets, group, handoffUrls }) {
     const j = await action({ groupId, kind: 'group.timezone', timezone: tz });
     if (j.ok) alert('時區已更新，提醒會依這個時區到點觸發'); else alert('失敗：' + j.error);
   }
+  const pickableMembers = members.filter((m) => !duty.includes(m));
 
   return (
     <div>
@@ -208,11 +254,39 @@ export default function PetsManager({ groupId, pets, group, handoffUrls }) {
           </div>
         </div>
         <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
-          <label style={C.sub}>輪值名單（每天輪一位，空白或逗號分隔）</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input style={C.input} value={duty} onChange={(e) => setDuty(e.target.value)} placeholder="例：爸 媽 我" />
-            <button style={C.ghost} onClick={saveDuty}>儲存</button>
+          <label style={C.sub}>輪值名單（每天輪一位，照排列順序輪）</label>
+          {duty.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {duty.map((name, i) => (
+                <span key={name} style={{ ...C.badge('#e8f3ed', '#2f7d5b'), display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  {i + 1}. {name}
+                  <button type="button" onClick={() => moveDuty(i, -1)} disabled={i === 0} style={{ border: 'none', background: 'none', color: '#2f7d5b', cursor: i === 0 ? 'default' : 'pointer', opacity: i === 0 ? 0.3 : 1, padding: 0, fontSize: 12 }}>↑</button>
+                  <button type="button" onClick={() => moveDuty(i, 1)} disabled={i === duty.length - 1} style={{ border: 'none', background: 'none', color: '#2f7d5b', cursor: i === duty.length - 1 ? 'default' : 'pointer', opacity: i === duty.length - 1 ? 0.3 : 1, padding: 0, fontSize: 12 }}>↓</button>
+                  <button type="button" onClick={() => removeDuty(name)} style={{ border: 'none', background: 'none', color: '#c0463b', cursor: 'pointer', padding: 0, fontSize: 12 }}>✕</button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {pickableMembers.length > 0 && (
+              <select style={{ ...C.input, width: 'auto', flex: '1 1 160px' }} value={dutyPick} onChange={(e) => { addDuty(e.target.value); setDutyPick(''); }}>
+                <option value="">＋ 從成員加入…</option>
+                {pickableMembers.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            )}
+            <input
+              style={{ ...C.input, width: 'auto', flex: '1 1 140px' }}
+              placeholder="或輸入其他名字"
+              value={dutyCustom}
+              onChange={(e) => setDutyCustom(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { addDuty(dutyCustom); setDutyCustom(''); } }}
+            />
+            <button style={C.ghost} onClick={() => { addDuty(dutyCustom); setDutyCustom(''); }}>加入</button>
           </div>
+          <div>
+            <button style={C.btn} onClick={saveDuty}>儲存輪值名單</button>
+          </div>
+          <span style={C.sub}>成員清單是曾在 LINE 群裡說過話或打卡過的人；沒看到的人可以直接用右邊輸入框加。</span>
         </div>
         <div style={{ display: 'grid', gap: 8 }}>
           <label style={C.sub}>過時補提醒（超過幾分鐘沒打卡補提醒一次，0 = 關閉）</label>

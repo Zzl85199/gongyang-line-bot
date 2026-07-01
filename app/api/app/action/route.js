@@ -4,6 +4,7 @@
 import { getSessionUser } from '../../../../lib/session.js';
 import * as webdb from '../../../../lib/webdb.js';
 import * as db from '../../../../lib/db.js';
+import * as community from '../../../../lib/community.js';
 import * as line from '../../../../lib/line.js';
 import * as msg from '../../../../lib/messages.js';
 import { parseTimes } from '../../../../lib/time.js';
@@ -332,6 +333,67 @@ export async function POST(req) {
         }
         await db.setTimezone(groupId, tz);
         return ok();
+      }
+
+      // ---------- 社群設定：毛孩公開開關 / 簡介 ----------
+      case 'pet.public': {
+        if (!needManage()) return no('forbidden', 403);
+        const pet = await db.getPet(Number(body.petId));
+        if (!pet || pet.group_id !== groupId) return no('pet_not_found');
+        const updated = await community.setPetPublic(pet.id, Boolean(body.public), body.bio !== undefined ? (body.bio || '').trim() : undefined);
+        return ok({ pet: updated });
+      }
+
+      // ---------- 社群：貼文 / 留言 / 按讚 ----------
+      case 'community.create': {
+        if (!needCheckin()) return no('forbidden', 403);
+        const pet = await db.getPet(Number(body.petId));
+        if (!pet || pet.group_id !== groupId) return no('pet_not_found');
+        if (!pet.public) return no('pet_not_public');
+        const bodyText = (body.body || '').trim();
+        if (!bodyText) return no('empty');
+        const kind = ['post', 'question', 'resource'].includes(body.postKind) ? body.postKind : 'post';
+        const post = await community.createPost({
+          petId: pet.id,
+          groupId,
+          authorUserId: user.id,
+          authorName: user.display_name || '一位飼主',
+          kind,
+          body: bodyText,
+          region: kind === 'resource' ? (body.region || '').trim() || null : null,
+          duration: kind === 'resource' ? (body.duration || '').trim() || null : null,
+        });
+        return ok({ post });
+      }
+      case 'community.delete': {
+        const post = await community.getPost(Number(body.postId));
+        if (!post) return no('not_found');
+        const isAuthor = post.author_user_id && String(post.author_user_id) === String(user.id);
+        if (!isAuthor && !needManage()) return no('forbidden', 403);
+        await community.deletePost(post.id);
+        return ok();
+      }
+      case 'community.comment': {
+        const post = await community.getPost(Number(body.postId));
+        if (!post) return no('not_found');
+        const bodyText = (body.body || '').trim();
+        if (!bodyText) return no('empty');
+        const comment = await community.addComment(post.id, { authorUserId: user.id, authorName: user.display_name || '一位飼主', body: bodyText });
+        return ok({ comment });
+      }
+      case 'community.commentDelete': {
+        const comment = await community.getComment(Number(body.commentId));
+        if (!comment) return no('not_found');
+        const isAuthor = comment.author_user_id && String(comment.author_user_id) === String(user.id);
+        if (!isAuthor && !needManage()) return no('forbidden', 403);
+        await community.deleteComment(comment.id);
+        return ok();
+      }
+      case 'community.like': {
+        const post = await community.getPost(Number(body.postId));
+        if (!post) return no('not_found');
+        const result = await community.toggleLike(post.id, user.id);
+        return ok(result);
       }
 
       default:
