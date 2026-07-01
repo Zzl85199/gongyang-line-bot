@@ -10,11 +10,14 @@ export const runtime = 'nodejs';
 export default async function HealthPage({ params }) {
   const groupId = decodeURIComponent(params.groupId);
   const user = await getSessionUser();
-  const access = await webdb.effectiveAccess(groupId, user);
+  const [access, pets] = await Promise.all([
+    webdb.effectiveAccess(groupId, user),
+    db.listAllPets(groupId), // 含紀念，方便回看病史
+  ]);
 
-  const pets = await db.listAllPets(groupId); // 含紀念，方便回看病史
   const logsByPet = {};
-  for (const p of pets) logsByPet[p.id] = await db.allHealthLogs(p.id, 200);
+  const logsList = await Promise.all(pets.map((p) => db.allHealthLogs(p.id, 200)));
+  pets.forEach((p, i) => { logsByPet[p.id] = logsList[i]; });
 
   return (
     <HealthManager

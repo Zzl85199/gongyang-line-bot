@@ -10,11 +10,14 @@ export const runtime = 'nodejs';
 export default async function WalksPage({ params }) {
   const groupId = decodeURIComponent(params.groupId);
   const user = await getSessionUser();
-  const access = await webdb.effectiveAccess(groupId, user);
+  const [access, pets] = await Promise.all([
+    webdb.effectiveAccess(groupId, user),
+    db.listPets(groupId),
+  ]);
 
-  const pets = await db.listPets(groupId);
   const walksByPet = {};
-  for (const p of pets) walksByPet[p.id] = await db.listWalkLogs(p.id, 100);
+  const walksList = await Promise.all(pets.map((p) => db.listWalkLogs(p.id, 100)));
+  pets.forEach((p, i) => { walksByPet[p.id] = walksList[i]; });
 
   return (
     <WalksManager

@@ -42,15 +42,16 @@ export default async function StatsPage({ params }) {
   const weekStartIso = taipeiMidnightIso(weekStartKey);
   const monthStartIso = taipeiMidnightIso(monthStartKey);
 
-  const pets = await db.listPets(groupId);
-  const tasks = await db.listTasksByGroup(groupId);
-  const weekLogs = await db.logsBetween(groupId, weekStartIso, nowIso);
+  const [pets, tasks, weekLogs] = await Promise.all([
+    db.listPets(groupId),
+    db.listTasksByGroup(groupId),
+    db.logsBetween(groupId, weekStartIso, nowIso),
+  ]);
   // 統計每個 task 本週的打卡次數
   const doneCount = {};
   for (const l of weekLogs) doneCount[l.task_id] = (doneCount[l.task_id] || 0) + 1;
 
-  const blocks = [];
-  for (const pet of pets) {
+  const blocks = await Promise.all(pets.map(async (pet) => {
     const petTasks = tasks.filter((t) => t.pet_id === pet.id);
     const rows = petTasks.map((t) => {
       const slots = (t.times || []).length;
@@ -59,10 +60,12 @@ export default async function StatsPage({ params }) {
       const pct = expected ? Math.round((done / expected) * 100) : 0;
       return { name: t.name, emoji: t.emoji || '⏰', expected, done, pct };
     });
-    const walkWeek = await db.countWalksBetween(pet.id, weekStartIso, nowIso);
-    const walkMonth = await db.countWalksBetween(pet.id, monthStartIso, nowIso);
-    blocks.push({ pet, rows, walkWeek, walkMonth });
-  }
+    const [walkWeek, walkMonth] = await Promise.all([
+      db.countWalksBetween(pet.id, weekStartIso, nowIso),
+      db.countWalksBetween(pet.id, monthStartIso, nowIso),
+    ]);
+    return { pet, rows, walkWeek, walkMonth };
+  }));
 
   return (
     <div>

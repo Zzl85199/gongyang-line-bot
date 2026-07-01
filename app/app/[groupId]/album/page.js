@@ -10,16 +10,22 @@ export const runtime = 'nodejs';
 export default async function AlbumPage({ params }) {
   const groupId = decodeURIComponent(params.groupId);
   const user = await getSessionUser();
-  const access = await webdb.effectiveAccess(groupId, user);
+  const [access, pets] = await Promise.all([
+    webdb.effectiveAccess(groupId, user),
+    db.listAllPets(groupId),
+  ]);
 
-  const pets = await db.listAllPets(groupId);
   const collectionsByPet = {};
   const entriesByPet = {};
-  for (const p of pets) {
-    collectionsByPet[p.id] = await db.listAllCollections(p.id);
-    const rows = (await db.recentLifebook(p.id, 300)).filter((e) => e.photo_path);
+
+  async function loadPetAlbum(p) {
+    const [collections, rawRows] = await Promise.all([
+      db.listAllCollections(p.id),
+      db.recentLifebook(p.id, 300),
+    ]);
+    const rows = rawRows.filter((e) => e.photo_path);
     const urls = await Promise.all(rows.map((e) => db.signedPhotoUrl(e.photo_path, 3600)));
-    entriesByPet[p.id] = rows.map((e, i) => ({
+    const entries = rows.map((e, i) => ({
       id: e.id,
       url: urls[i],
       caption: e.caption || '',
@@ -27,6 +33,13 @@ export default async function AlbumPage({ params }) {
       by_name: e.by_name || null,
       created_at: e.created_at,
     })).filter((e) => e.url);
+    return { petId: p.id, collections, entries };
+  }
+
+  const petAlbums = await Promise.all(pets.map(loadPetAlbum));
+  for (const { petId, collections, entries } of petAlbums) {
+    collectionsByPet[petId] = collections;
+    entriesByPet[petId] = entries;
   }
 
   return (
