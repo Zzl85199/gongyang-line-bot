@@ -25,6 +25,7 @@ export default async function CommunityPostPage({ params }) {
 
   const initialPost = {
     id: post.id,
+    groupId: post.group_id,
     petId: post.pet_id,
     petName: post.pets?.name || '毛孩',
     species: post.pets?.species || null,

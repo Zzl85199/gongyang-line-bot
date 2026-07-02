@@ -42,7 +42,7 @@ function Composer({ myPublicPets, onCreated, groupId, forceOpenKind, onConsumeFo
   async function submit() {
     if (!petId || !body.trim()) return;
     setBusy(true);
-    const j = await action({ kind: 'community.create', petId, postKind: kind, body, region, duration });
+    const j = await action({ kind: 'community.create', groupId, petId, postKind: kind, body, region, duration });
     if (j.ok && file) {
       const fd = new FormData();
       fd.append('postId', j.post.id);
@@ -146,7 +146,7 @@ export default function CommunityFeed({ initialPosts, myPublicPets, firstGroupId
 
   async function toggleLike(postId) {
     setPosts(posts.map((p) => (p.id === postId ? { ...p, liked: !p.liked, likeCount: p.likeCount + (p.liked ? -1 : 1) } : p)));
-    const j = await action({ kind: 'community.like', postId });
+    const j = await action({ kind: 'community.like', groupId: firstGroupId, postId });
     if (!j.ok) router.refresh();
   }
 

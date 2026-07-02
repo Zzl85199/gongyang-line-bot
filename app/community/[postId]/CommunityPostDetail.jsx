@@ -25,25 +25,25 @@ export default function CommunityPostDetail({ initialPost, initialComments, myUs
 
   async function toggleLike() {
     setPost({ ...post, liked: !post.liked, likeCount: post.likeCount + (post.liked ? -1 : 1) });
-    const j = await action({ kind: 'community.like', postId: post.id });
+    const j = await action({ kind: 'community.like', groupId: post.groupId, postId: post.id });
     if (!j.ok) router.refresh();
   }
   async function sendComment() {
     if (!text.trim()) return;
     setBusy(true);
-    const j = await action({ kind: 'community.comment', postId: post.id, body: text });
+    const j = await action({ kind: 'community.comment', groupId: post.groupId, postId: post.id, body: text });
     setBusy(false);
     if (j.ok) { setComments([...comments, { id: j.comment.id, body: j.comment.body, authorName: j.comment.author_name, authorUserId: j.comment.author_user_id, createdAt: j.comment.created_at }]); setText(''); }
     else alert('留言失敗：' + j.error);
   }
   async function delComment(id) {
     if (!confirm('刪除這則留言？')) return;
-    const j = await action({ kind: 'community.commentDelete', commentId: id });
+    const j = await action({ kind: 'community.commentDelete', groupId: post.groupId, commentId: id });
     if (j.ok) setComments(comments.filter((c) => c.id !== id)); else alert('刪除失敗：' + j.error);
   }
   async function delPost() {
     if (!confirm('刪除這篇貼文？')) return;
-    const j = await action({ kind: 'community.delete', postId: post.id });
+    const j = await action({ kind: 'community.delete', groupId: post.groupId, postId: post.id });
     if (j.ok) router.push('/community'); else alert('刪除失敗：' + j.error);
   }
 
