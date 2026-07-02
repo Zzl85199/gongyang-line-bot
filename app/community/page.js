@@ -43,5 +43,5 @@ export default async function CommunityPage() {
     liked: liked.has(p.id),
   }));
 
-  return <CommunityFeed initialPosts={initialPosts} myPublicPets={myPublicPets} hasAnyPublicPet={myPublicPets.length > 0} />;
+  return <CommunityFeed initialPosts={initialPosts} myPublicPets={myPublicPets} hasAnyPublicPet={myPublicPets.length > 0} firstGroupId={groups[0]?.groupId || null} />;
 }

@@ -1,7 +1,7 @@
 'use client';
 // app/community/CommunityFeed.jsx
 // 社群首頁：篩選 chip（全部/動態/問答/找保母送養）+ 發文 + 卡片列表。
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { page, container, card, h1, sub, btn, btnGhost, input, colors, badge } from '../app/ui.js';
 
@@ -22,7 +22,7 @@ function fmtTime(iso) {
   return new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric' }).format(d);
 }
 
-function Composer({ myPublicPets, onCreated }) {
+function Composer({ myPublicPets, onCreated, groupId, forceOpenKind, onConsumeForceOpen }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState('post');
   const [petId, setPetId] = useState(myPublicPets[0]?.id || '');
@@ -31,6 +31,13 @@ function Composer({ myPublicPets, onCreated }) {
   const [duration, setDuration] = useState('');
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!forceOpenKind) return;
+    setOpen(true);
+    setKind(forceOpenKind);
+    onConsumeForceOpen?.();
+  }, [forceOpenKind]);
 
   async function submit() {
     if (!petId || !body.trim()) return;
@@ -53,6 +60,11 @@ function Composer({ myPublicPets, onCreated }) {
     return (
       <div style={{ ...card, background: colors.brandSoft, border: 'none' }}>
         <span style={sub}>要發文得先有一隻「公開到社群」的毛孩。到「毛孩檔案」頁開啟公開開關就能回來發文了。</span>
+        {groupId && (
+          <div style={{ marginTop: 10 }}>
+            <a href={`/app/${encodeURIComponent(groupId)}/pets`} style={btn}>前往「毛孩檔案」開啟公開 →</a>
+          </div>
+        )}
       </div>
     );
   }
@@ -124,10 +136,11 @@ function PostCard({ post, onToggleLike }) {
   );
 }
 
-export default function CommunityFeed({ initialPosts, myPublicPets }) {
+export default function CommunityFeed({ initialPosts, myPublicPets, firstGroupId }) {
   const router = useRouter();
   const [filter, setFilter] = useState('all');
   const [posts, setPosts] = useState(initialPosts);
+  const [forceKind, setForceKind] = useState(null);
 
   const shown = filter === 'all' ? posts : posts.filter((p) => p.kind === filter);
 
@@ -146,7 +159,25 @@ export default function CommunityFeed({ initialPosts, myPublicPets }) {
         </div>
         <p style={{ ...sub, marginBottom: 12 }}>不同飼主之間的公開動態、問答與找保母送養。</p>
 
-        <Composer myPublicPets={myPublicPets} onCreated={() => router.refresh()} />
+        <div style={{ ...card, background: colors.brandSoft, border: 'none', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+          <button style={btn} onClick={() => setForceKind('resource')}>🔍 找保母／送養（公開發文）</button>
+          <span style={{ ...sub, fontSize: 12 }}>
+            只是想請「已經認識」的人幫忙臨托？不用公開毛孩資料，
+            {firstGroupId ? (
+              <a href={`/app/${encodeURIComponent(firstGroupId)}/pets`} style={{ color: colors.brand }}> 用「交接卡」分享給對方更快 →</a>
+            ) : (
+              ' 用「交接卡」分享給對方更快。'
+            )}
+          </span>
+        </div>
+
+        <Composer
+          myPublicPets={myPublicPets}
+          onCreated={() => router.refresh()}
+          groupId={firstGroupId}
+          forceOpenKind={forceKind}
+          onConsumeForceOpen={() => setForceKind(null)}
+        />
 
         <div style={{ display: 'flex', gap: 8, margin: '14px 0', flexWrap: 'wrap' }}>
           {FILTERS.map(([k, l]) => (
