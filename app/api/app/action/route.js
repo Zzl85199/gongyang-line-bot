@@ -396,6 +396,24 @@ export async function POST(req) {
         return ok(result);
       }
 
+      // ---------- 刪除整個照護圈 / 退出照護圈（後台專用危險操作） ----------
+      case 'group.delete': {
+        if (!needManage()) return no('forbidden', 403); // 只有主飼主（開放模式則等同人人都是）能刪
+        const pets = await db.listAllPets(groupId);
+        const confirmPhrase = pets.map((p) => p.name).join('、') || groupId;
+        if ((body.confirmText || '').trim() !== confirmPhrase) return no('confirm_mismatch');
+        await db.deleteGroupFully(groupId); // 連照片檔案、所有寵物/紀錄一起永久刪除
+        return ok();
+      }
+      case 'group.leave': {
+        if (access.source === 'grant') {
+          await webdb.revokeGrant(access.grant.id, groupId); // 對外授權（獸醫/保母）：撤銷自己那筆授權
+        } else {
+          await db.removeMember(groupId, user.line_user_id); // LINE 成員：移除自己的成員紀錄，不動其他人
+        }
+        return ok();
+      }
+
       default:
         return no('unknown_kind');
     }

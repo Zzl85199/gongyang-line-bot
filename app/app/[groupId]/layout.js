@@ -31,6 +31,7 @@ export default async function GroupLayout({ children, params }) {
   ];
   if (isManager) tabs.push({ href: `/app/${groupId}/pets`, label: '毛孩檔案' });
   if (isManager) tabs.push({ href: `/app/${groupId}/members`, label: '成員 / 授權' });
+  tabs.push({ href: `/app/${groupId}/settings`, label: '設定' });
 
   return (
     <main style={page}>
