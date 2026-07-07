@@ -161,7 +161,9 @@ async function run() {
       const act = suggestActivity(pet);
       if (act) {
         try {
-          await line.push(g.id, msg.weeklyTask(pet, act));
+          const sent = await line.push(g.id, msg.weeklyTask(pet, act));
+          const msgId = line.lastSentMessageId(sent);
+          if (msgId) await db.addPendingPhotoTask(g.id, pet, msgId, act.title, 'activity', 7 * 24 * 60);
           pushed++;
         } catch (e) {
           console.error('push weekly task failed', e.message);
